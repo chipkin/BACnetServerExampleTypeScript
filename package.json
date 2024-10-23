@@ -1,0 +1,23 @@
+{
+  "name": "BACnet-Server-Example-TypeScript",
+  "version": "1.0.0",
+  "description": "A BACnet Server Example written in TypeScript using the CAS BACnet Stack",
+  "main": "app.js",
+  "scripts": {
+    "start": "ts-node app.ts",
+    "build": "tsc",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "Steven Smethurst (Chipkin Automation Systems)",
+  "license": "ISC",
+  "dependencies": {
+    "@chipkin/cas-bacnet-stack": "^0.0.21",
+    "dequeue": "^1.0.5",
+    "dgram": "^1.0.1"
+  },
+  "devDependencies": {
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.3"
+  }
+}
