@@ -1,8 +1,6 @@
 /**
  * BACnet Server Example in TypeScript
  * This example demonstrates how to create a BACnet server using the CAS BACnet Stack in TypeScript.
- * 
- * 
  */
 const CASBACnetStack = require("@chipkin/cas-bacnet-stack")
 
@@ -37,6 +35,9 @@ const SERVICES_SUPPORTED_WRITE_PROPERTY_MULTIPLE: number = 16;
 
 const BACNET_PROPERTY_IDENTIFIER_OBJECT_NAME: number = 77;
 const BACNET_PROPERTY_IDENTIFIER_PRESENT_VALUE: number = 85;
+const BACNET_PROPERTY_IDENTIFIER_UNITS: number = 117;
+const BACNET_PROPERTY_IDENTIFIER_NUMBER_OF_STATES: number = 74;
+const BACNET_PROPERTY_IDENTIFIER_STATE_TEXT: number = 110;
 
 // Callback functions
 // --------------------------------------------------------------------------------------------
@@ -48,6 +49,13 @@ var FuncPtrCallbackLogDebugMessage = CallbackLogDebugMessage;
 
 const FuncPtrCallbackGetPropertyCharacterString = GetPropertyCharacterString;
 const FuncPtrCallbackGetPropertyReal = GetPropertyReal;
+const FuncPtrCallbackGetPropertyBool = GetPropertyBool;
+const FuncPtrCallbackGetPropertyEnumerated = GetPropertyEnumerated;
+const FuncPtrCallbackGetPropertyUnsignedInteger = GetPropertyUnsignedInteger;
+
+const FuncPtrCallbackSetPropertyReal = SetPropertyReal;
+const FuncPtrCallbackSetPropertyUnsignedInteger = SetPropertyUnsignedInteger;
+const FuncPtrCallbackSetPropertyEnumerated = SetPropertyEnumerated;
 
 // Globals
 let fifoRecvBuffer = new dequeue();
@@ -59,16 +67,24 @@ let networkPort = {
 };
 
 // Database Values
-// This is hard coded for this example. In a real application, this would be stored in a database.
-let analog_input_object_name: string = "AnalogInput Bronze";
+// These values are globals to make the example simple to understand. 
+// Normally these values would come from a database or other source.
+let device_object_name: string = "CAS BACnet Stack TypeScript Example";
 let analog_input_present_value: number = 127.5;
+let multi_state_input_statetext = ["Off", "On", "Blinking"];
+let multi_state_value_statetext = ["Hot", "Cold", "Luke Warm"];
+
+
+// This is a simple key/value database used as an example for the Example.
+// This database format is not suitable for production. 
+let db = new Map<string, any>();
 
 
 function StartUp() {
   // Print the version information
-  console.log("BACnet Server Example in TypeScript Version: " + APPLICATION_VERSION);
-  console.log("https://github.com/chipkin/BACnetServerExampleTypeScript");
-  console.log("CAS BACnet Stack Version: "
+  console.log("FYI: BACnet Server Example in TypeScript Version: " + APPLICATION_VERSION);
+  console.log("FYI: https://github.com/chipkin/BACnetServerExampleTypeScript");
+  console.log("FYI: CAS BACnet Stack Version: "
     + CASBACnetStack.GetAPIMajorVersion() + "."
     + CASBACnetStack.GetAPIMinorVersion() + "."
     + CASBACnetStack.GetAPIPatchVersion() + "."
@@ -88,7 +104,14 @@ function StartUp() {
   // Callback Get Property 
   CASBACnetStack.RegisterCallbackGetPropertyCharacterString(FuncPtrCallbackGetPropertyCharacterString);
   CASBACnetStack.RegisterCallbackGetPropertyReal(FuncPtrCallbackGetPropertyReal);
+  CASBACnetStack.RegisterCallbackGetPropertyBool(FuncPtrCallbackGetPropertyBool);
+  CASBACnetStack.RegisterCallbackGetPropertyEnumerated(FuncPtrCallbackGetPropertyEnumerated);
+  CASBACnetStack.RegisterCallbackGetPropertyUnsignedInteger(FuncPtrCallbackGetPropertyUnsignedInteger);
 
+  // Callbacks Set Property
+  CASBACnetStack.RegisterCallbackSetPropertyReal(FuncPtrCallbackSetPropertyReal);
+  CASBACnetStack.RegisterCallbackSetPropertyUnsignedInteger(FuncPtrCallbackSetPropertyUnsignedInteger);
+  CASBACnetStack.RegisterCallbackSetPropertyEnumerated(FuncPtrCallbackSetPropertyEnumerated);
 
   // Setup the BACnet device.
   // ------------------------------------------------------------------------
@@ -96,13 +119,18 @@ function StartUp() {
   CASBACnetStack.AddDevice(SETTING_DEVICE_INSTANCE);
   CASBACnetStack.AddObject(SETTING_DEVICE_INSTANCE, BACNET_OBJECT_TYPE_ANALOG_INPUT, 0);
   // CASBACnetStack.AddObject(SETTING_DEVICE_INSTANCE, BACNET_OBJECT_TYPE_ANALOG_OUTPUT, 1);
-  // CASBACnetStack.AddObject(SETTING_DEVICE_INSTANCE, BACNET_OBJECT_TYPE_ANALOG_VALUE, 2);
+  CASBACnetStack.AddObject(SETTING_DEVICE_INSTANCE, BACNET_OBJECT_TYPE_ANALOG_VALUE, 2);
   CASBACnetStack.AddObject(SETTING_DEVICE_INSTANCE, BACNET_OBJECT_TYPE_BINARY_INPUT, 3);
   // CASBACnetStack.AddObject(SETTING_DEVICE_INSTANCE, BACNET_OBJECT_TYPE_BINARY_OUTPUT, 4);
-  // CASBACnetStack.AddObject(SETTING_DEVICE_INSTANCE, BACNET_OBJECT_TYPE_BINARY_VALUE, 5);
+  CASBACnetStack.AddObject(SETTING_DEVICE_INSTANCE, BACNET_OBJECT_TYPE_BINARY_VALUE, 5);
   CASBACnetStack.AddObject(SETTING_DEVICE_INSTANCE, BACNET_OBJECT_TYPE_MULTI_STATE_INPUT, 13);
   // CASBACnetStack.AddObject(SETTING_DEVICE_INSTANCE, BACNET_OBJECT_TYPE_MULTI_STATE_OUTPUT, 14);
-  // CASBACnetStack.AddObject(SETTING_DEVICE_INSTANCE, BACNET_OBJECT_TYPE_MULTI_STATE_VALUE, 19);
+  CASBACnetStack.AddObject(SETTING_DEVICE_INSTANCE, BACNET_OBJECT_TYPE_MULTI_STATE_VALUE, 19);
+
+  // Set some properties to be writable
+  CASBACnetStack.SetPropertyWritable(SETTING_DEVICE_INSTANCE, BACNET_OBJECT_TYPE_ANALOG_VALUE, 2, BACNET_PROPERTY_IDENTIFIER_PRESENT_VALUE, true);
+  CASBACnetStack.SetPropertyWritable(SETTING_DEVICE_INSTANCE, BACNET_OBJECT_TYPE_BINARY_VALUE, 5, BACNET_PROPERTY_IDENTIFIER_PRESENT_VALUE, true);
+  CASBACnetStack.SetPropertyWritable(SETTING_DEVICE_INSTANCE, BACNET_OBJECT_TYPE_MULTI_STATE_VALUE, 19, BACNET_PROPERTY_IDENTIFIER_PRESENT_VALUE, true);
 
   // Setup the BACnet Services
   CASBACnetStack.SetServiceEnabled(SETTING_DEVICE_INSTANCE, SERVICES_SUPPORTED_READ_PROPERTY_MULTIPLE, true);
@@ -110,12 +138,39 @@ function StartUp() {
   CASBACnetStack.SetServiceEnabled(SETTING_DEVICE_INSTANCE, SERVICES_SUPPORTED_WRITE_PROPERTY_MULTIPLE, true);
   CASBACnetStack.SetServiceEnabled(SETTING_DEVICE_INSTANCE, SERVICES_SUPPORTED_SUBSCRIBE_COV, true);
 
+  // Setup the BACnet Database
+  // ------------------------------------------------------------------------
+  console.log('FYI: Setting up bacnet database with values...');
+  // This is a very simple database used for the example.
+  // This database format is not suitable for production. 
+  db.set('' + SETTING_DEVICE_INSTANCE + '.' + BACNET_OBJECT_TYPE_DEVICE + '.' + SETTING_DEVICE_INSTANCE + '.' + BACNET_PROPERTY_IDENTIFIER_OBJECT_NAME, device_object_name);
+  db.set('' + SETTING_DEVICE_INSTANCE + '.' + BACNET_OBJECT_TYPE_ANALOG_INPUT + '.0.' + BACNET_PROPERTY_IDENTIFIER_OBJECT_NAME, "AnalogInput Bronze");
+  db.set('' + SETTING_DEVICE_INSTANCE + '.' + BACNET_OBJECT_TYPE_ANALOG_INPUT + '.0.' + BACNET_PROPERTY_IDENTIFIER_PRESENT_VALUE, analog_input_present_value);
+  db.set('' + SETTING_DEVICE_INSTANCE + '.' + BACNET_OBJECT_TYPE_ANALOG_INPUT + '.0.' + BACNET_PROPERTY_IDENTIFIER_UNITS, 31);// 31 = meters
+  // db.set('' + SETTING_DEVICE_INSTANCE + '.' + BACNET_OBJECT_TYPE_ANALOG_OUTPUT + '.1.' + BACNET_PROPERTY_IDENTIFIER_OBJECT_NAME, "AnalogOutput Chartreuse");  
+  db.set('' + SETTING_DEVICE_INSTANCE + '.' + BACNET_OBJECT_TYPE_ANALOG_VALUE + '.2.' + BACNET_PROPERTY_IDENTIFIER_OBJECT_NAME, "AnalogValue Diamond");
+  db.set('' + SETTING_DEVICE_INSTANCE + '.' + BACNET_OBJECT_TYPE_ANALOG_VALUE + '.2.' + BACNET_PROPERTY_IDENTIFIER_PRESENT_VALUE, 1245.3);
+  db.set('' + SETTING_DEVICE_INSTANCE + '.' + BACNET_OBJECT_TYPE_BINARY_INPUT + '.3.' + BACNET_PROPERTY_IDENTIFIER_OBJECT_NAME, "BinaryInput Emerald");
+  db.set('' + SETTING_DEVICE_INSTANCE + '.' + BACNET_OBJECT_TYPE_BINARY_INPUT + '.3.' + BACNET_PROPERTY_IDENTIFIER_PRESENT_VALUE, 1);
+  // db.set('' + SETTING_DEVICE_INSTANCE + '.' + BACNET_OBJECT_TYPE_BINARY_OUTPUT + '.4.' + BACNET_PROPERTY_IDENTIFIER_OBJECT_NAME, "BinaryOutput Fuchsia");
+  db.set('' + SETTING_DEVICE_INSTANCE + '.' + BACNET_OBJECT_TYPE_BINARY_VALUE + '.5.' + BACNET_PROPERTY_IDENTIFIER_OBJECT_NAME, "BinaryValue Gold");
+  db.set('' + SETTING_DEVICE_INSTANCE + '.' + BACNET_OBJECT_TYPE_BINARY_VALUE + '.5.' + BACNET_PROPERTY_IDENTIFIER_PRESENT_VALUE, 0);
+  db.set('' + SETTING_DEVICE_INSTANCE + '.' + BACNET_OBJECT_TYPE_MULTI_STATE_INPUT + '.13.' + BACNET_PROPERTY_IDENTIFIER_OBJECT_NAME, "MultiStateInput Hot Pink");
+  db.set('' + SETTING_DEVICE_INSTANCE + '.' + BACNET_OBJECT_TYPE_MULTI_STATE_INPUT + '.13.' + BACNET_PROPERTY_IDENTIFIER_PRESENT_VALUE, 2);
+  db.set('' + SETTING_DEVICE_INSTANCE + '.' + BACNET_OBJECT_TYPE_MULTI_STATE_INPUT + '.13.' + BACNET_PROPERTY_IDENTIFIER_STATE_TEXT, multi_state_input_statetext);
+  db.set('' + SETTING_DEVICE_INSTANCE + '.' + BACNET_OBJECT_TYPE_MULTI_STATE_INPUT + '.13.' + BACNET_PROPERTY_IDENTIFIER_NUMBER_OF_STATES, multi_state_input_statetext.length);
+  // db.set('' + SETTING_DEVICE_INSTANCE + '.' + BACNET_OBJECT_TYPE_MULTI_STATE_OUTPUT + '.14.' + BACNET_PROPERTY_IDENTIFIER_OBJECT_NAME, "MultiStateOutput Indigo");
+  db.set('' + SETTING_DEVICE_INSTANCE + '.' + BACNET_OBJECT_TYPE_MULTI_STATE_VALUE + '.19.' + BACNET_PROPERTY_IDENTIFIER_OBJECT_NAME, "MultiStateValue Kiwi");
+  db.set('' + SETTING_DEVICE_INSTANCE + '.' + BACNET_OBJECT_TYPE_MULTI_STATE_VALUE + '.19.' + BACNET_PROPERTY_IDENTIFIER_PRESENT_VALUE, 3);
+  db.set('' + SETTING_DEVICE_INSTANCE + '.' + BACNET_OBJECT_TYPE_MULTI_STATE_VALUE + '.19.' + BACNET_PROPERTY_IDENTIFIER_STATE_TEXT, multi_state_value_statetext);
+  db.set('' + SETTING_DEVICE_INSTANCE + '.' + BACNET_OBJECT_TYPE_MULTI_STATE_VALUE + '.19.' + BACNET_PROPERTY_IDENTIFIER_NUMBER_OF_STATES, multi_state_value_statetext.length);
+
+
   // Setup the UDP Socket
   // ------------------------------------------------------------------------
   udp.on('error', (err: any) => {
     console.error(`UDP.Server error:\n ${err.stack}`);
     udp.close();
-    process.exit(1); // Close the application 
   });
 
   udp.on('message', (msg: any, rinfo: any) => {
@@ -128,6 +183,7 @@ function StartUp() {
   });
   udp.on('exit', () => {
     console.log(`FYI: UDP.Server Exit`);
+    process.exit(1); // Close the application 
   });
 
   // Get the local IP address of the computer
@@ -185,6 +241,7 @@ function StartUp() {
   setInterval(() => {
     // Update the values of the analog inputs to simulate real world values.
     analog_input_present_value += 1.1;
+    db.set('' + SETTING_DEVICE_INSTANCE + '.' + BACNET_OBJECT_TYPE_ANALOG_INPUT + '.0.' + BACNET_PROPERTY_IDENTIFIER_PRESENT_VALUE, analog_input_present_value);
 
     // Tell the CAS BACnet Stack that the value has been update so that it can send COV messages
     CASBACnetStack.ValueUpdated(SETTING_DEVICE_INSTANCE, BACNET_OBJECT_TYPE_ANALOG_INPUT, 0, BACNET_PROPERTY_IDENTIFIER_PRESENT_VALUE);
@@ -257,6 +314,7 @@ function CallbackRecvMessage(message: Buffer, maxMessageLength: number, sourceCo
   sourceConnectionStringLength.writeUInt8(CONNECTION_STRING_IP_LENGTH, 0);
 
   // Return the message length
+  console.log('Received message from: ' + address + ', messageLength: ' + msg.length);
   return msg.length;
 }
 
@@ -274,45 +332,46 @@ function CallbackLogDebugMessage(messageBuffer: Buffer, _messageBufferLength: nu
 
 
 export function GetPropertyCharacterString(deviceInstance: number, objectType: number, objectInstance: number, propertyIdentifier: number, value: Buffer, valueElementCount: Buffer, maxElementCount: number, encodingType: Buffer, useArrayIndex: boolean, propertyArrayIndex: number): boolean {
-  console.log('GetPropertyCharacterString deviceInstance: ' + deviceInstance + ', objectType: ' + objectType + ', objectInstance: ' + objectInstance + ', propertyIdentifier: ' + propertyIdentifier);
+  console.log('GetPropertyCharacterString deviceInstance: ' + deviceInstance + ', objectType: ' + objectType + ', objectInstance: ' + objectInstance + ', propertyIdentifier: ' + propertyIdentifier + ', useArrayIndex: ' + useArrayIndex + ', propertyArrayIndex: ' + propertyArrayIndex);
 
   // Example 1 - Device Object Name
   if (deviceInstance == SETTING_DEVICE_INSTANCE && objectType == BACNET_OBJECT_TYPE_DEVICE) {
     if (propertyIdentifier == BACNET_PROPERTY_IDENTIFIER_OBJECT_NAME) {
-      const deviceName = "CAS BACnet Stack TypeScript Example";
-
-      if (deviceName.length > maxElementCount) {
+      // Check the length
+      if (device_object_name.length > maxElementCount) {
         return false; // The buffer is too small to hold the value.
       }
 
-      value.write(deviceName, 0, deviceName.length);
-      valueElementCount.writeUInt32LE(deviceName.length, 0);
+      value.write(device_object_name, 0, device_object_name.length);
+      valueElementCount.writeUInt32LE(device_object_name.length, 0);
       encodingType.writeUInt8(0, 0); // 0 = ANSI_X3.4-1986
       return true;
     }
   }
 
-  // Example 2 - Analog Input Object Name
-  if (deviceInstance == SETTING_DEVICE_INSTANCE && objectType == BACNET_OBJECT_TYPE_ANALOG_INPUT) {
-    if (propertyIdentifier == BACNET_PROPERTY_IDENTIFIER_OBJECT_NAME) {
-      if (analog_input_object_name.length > maxElementCount) {
-        return false; // The buffer is too small to hold the value.
-      }
-
-      value.write(analog_input_object_name, 0, analog_input_object_name.length);
-      valueElementCount.writeUInt32LE(analog_input_object_name.length, 0);
-      encodingType.writeUInt8(0, 0); // 0 = ANSI_X3.4-1986
-      return true;
-    }
+  // Example 2 - Get from simple database
+  let dbValue = db.get('' + deviceInstance + '.' + objectType + '.' + objectInstance + '.' + propertyIdentifier);
+  // Check the datatype
+  if (typeof dbValue !== 'string') {
+    console.error('The value is not a string. Type: ' + typeof dbValue);
+    return false;
+  }
+  // Check the length
+  if (dbValue.length > maxElementCount) {
+    console.error('The value is too large for the buffer. Length: ' + dbValue.length + ', maxElementCount: ' + maxElementCount);
+    return false;
   }
 
-
-
-  return false;
+  value.write(dbValue, 0, dbValue.length);
+  valueElementCount.writeUInt32LE(dbValue.length, 0);
+  encodingType.writeUInt8(0, 0); // 0 = ANSI_X3.4-1986
+  return true;
 }
 export function GetPropertyReal(deviceInstance: number, objectType: number, objectInstance: number, propertyIdentifier: number, value: Buffer, useArrayIndex: boolean, propertyArrayIndex: number): boolean {
-  console.log('GetPropertyReal deviceInstance: ' + deviceInstance + ', objectType: ' + objectType + ', objectInstance: ' + objectInstance + ', propertyIdentifier: ' + propertyIdentifier);
+  console.log('GetPropertyReal deviceInstance: ' + deviceInstance + ', objectType: ' + objectType + ', objectInstance: ' + objectInstance + ', propertyIdentifier: ' + propertyIdentifier + ', useArrayIndex: ' + useArrayIndex + ', propertyArrayIndex: ' + propertyArrayIndex);
 
+  // Example 1 - Analog Input Present Value 
+  // ------------------------------------------------------------------------
   if (deviceInstance == SETTING_DEVICE_INSTANCE && objectType == BACNET_OBJECT_TYPE_ANALOG_INPUT) {
     if (propertyIdentifier == BACNET_PROPERTY_IDENTIFIER_PRESENT_VALUE) {
       value.writeFloatLE(analog_input_present_value, 0);
@@ -320,11 +379,138 @@ export function GetPropertyReal(deviceInstance: number, objectType: number, obje
     }
   }
 
-  return false;
+  // Example 2 - Get from simple database
+  // ------------------------------------------------------------------------
+  let dbValue = db.get('' + deviceInstance + '.' + objectType + '.' + objectInstance + '.' + propertyIdentifier);
+  if (dbValue === undefined) {
+    console.warn('The value is not defined in the database.');
+    return false;
+  }
+
+  // Check the datatype
+  if (typeof dbValue !== 'number') {
+    console.error('The value is not a number. Type: ' + typeof dbValue);
+    return false; // The value is not a number
+  }
+
+  value.writeFloatLE(dbValue, 0);
+  return true;
 }
 
+function GetPropertyBool(deviceInstance: number, objectType: number, objectInstance: number, propertyIdentifier: number, value: Buffer, useArrayIndex: boolean, propertyArrayIndex: number): boolean {
+  console.log('GetPropertyBool deviceInstance: ' + deviceInstance + ', objectType: ' + objectType + ', objectInstance: ' + objectInstance + ', propertyIdentifier: ' + propertyIdentifier + ', useArrayIndex: ' + useArrayIndex + ', propertyArrayIndex: ' + propertyArrayIndex);
 
+  // Example - Get from simple database
+  let dbValue = db.get('' + deviceInstance + '.' + objectType + '.' + objectInstance + '.' + propertyIdentifier);
+  if (dbValue === undefined) {
+    console.warn('The value is not defined in the database.');
+    return false;
+  }
+
+  // Check the datatype
+  if (typeof dbValue !== 'boolean') {
+    console.error('The value is not a boolean. Type: ' + typeof dbValue);
+    return false;
+  }
+
+  value.writeUInt8(dbValue ? 1 : 0, 0);
+  return true;
+}
+
+function GetPropertyEnumerated(deviceInstance: number, objectType: number, objectInstance: number, propertyIdentifier: number, value: Buffer, useArrayIndex: boolean, propertyArrayIndex: number): boolean {
+  console.log('GetPropertyEnumerated deviceInstance: ' + deviceInstance + ', objectType: ' + objectType + ', objectInstance: ' + objectInstance + ', propertyIdentifier: ' + propertyIdentifier + ', useArrayIndex: ' + useArrayIndex + ', propertyArrayIndex: ' + propertyArrayIndex);
+
+  // Example - Get from simple database
+  let dbValue = db.get('' + deviceInstance + '.' + objectType + '.' + objectInstance + '.' + propertyIdentifier);
+  if (dbValue === undefined) {
+    console.warn('The value is not defined in the database.');
+    return false;
+  }
+
+  // Check the datatype
+  if (typeof dbValue !== 'number') {
+    console.error('The value is not a number. Type: ' + typeof dbValue);
+    return false;
+  }
+
+  value.writeUint32LE(dbValue, 0);
+  return true
+}
+
+function GetPropertyUnsignedInteger(deviceInstance: number, objectType: number, objectInstance: number, propertyIdentifier: number, value: Buffer, useArrayIndex: boolean, propertyArrayIndex: number): boolean {
+  console.log('GetPropertyUnsignedInteger deviceInstance: ' + deviceInstance + ', objectType: ' + objectType + ', objectInstance: ' + objectInstance + ', propertyIdentifier: ' + propertyIdentifier + ', useArrayIndex: ' + useArrayIndex + ', propertyArrayIndex: ' + propertyArrayIndex);
+
+  // Example - Get from simple database
+  let dbValue = db.get('' + deviceInstance + '.' + objectType + '.' + objectInstance + '.' + propertyIdentifier);
+  if (dbValue === undefined) {
+    console.warn('The value is not defined in the database.');
+    return false;
+  }
+
+  // Check the datatype
+  if (typeof dbValue !== 'number') {
+    console.error('The value is not a number. Type: ' + typeof dbValue);
+    return false;
+  }
+
+  value.writeUInt32LE(dbValue, 0);
+  return true;
+}
+
+function SetPropertyReal(deviceInstance: number, objectType: number, objectInstance: number, propertyIdentifier: number, value: number, useArrayIndex: boolean, propertyArrayIndex: number, priority: number, errorCode: Buffer): boolean {
+  console.log('SetPropertyReal deviceInstance: ' + deviceInstance + ', objectType: ' + objectType + ', objectInstance: ' + objectInstance + ', propertyIdentifier: ' + propertyIdentifier + ', useArrayIndex: ' + useArrayIndex + ', propertyArrayIndex: ' + propertyArrayIndex + ', priority: ' + priority );
+
+  // Only allow writes to specific objects and properties
+  if (deviceInstance != SETTING_DEVICE_INSTANCE || propertyIdentifier != BACNET_PROPERTY_IDENTIFIER_PRESENT_VALUE) {
+    return false;
+  }
+
+  if (objectType != BACNET_OBJECT_TYPE_ANALOG_VALUE) {
+    return false;
+  }
+
+  // Example - Set to simple database
+  db.set('' + deviceInstance + '.' + objectType + '.' + objectInstance + '.' + propertyIdentifier, value);
+  console.log('SetPropertyReal successful. Value: ' + value);
+  return true;
+}
+
+function SetPropertyUnsignedInteger(deviceInstance: number, objectType: number, objectInstance: number, propertyIdentifier: number, value: number, useArrayIndex: boolean, propertyArrayIndex: number, priority: number, errorCode: Buffer): boolean {
+  console.log('SetPropertyUnsignedInteger deviceInstance: ' + deviceInstance + ', objectType: ' + objectType + ', objectInstance: ' + objectInstance + ', propertyIdentifier: ' + propertyIdentifier + ', useArrayIndex: ' + useArrayIndex + ', propertyArrayIndex: ' + propertyArrayIndex + ', priority: ' + priority );
+
+  // Only allow writes to specific objects and properties
+  if (deviceInstance != SETTING_DEVICE_INSTANCE || propertyIdentifier != BACNET_PROPERTY_IDENTIFIER_PRESENT_VALUE) {
+    return false;
+  }
+
+  if (objectType != BACNET_OBJECT_TYPE_MULTI_STATE_VALUE) {
+    return false;
+  }
+
+  // Example - Set to simple database
+  db.set('' + deviceInstance + '.' + objectType + '.' + objectInstance + '.' + propertyIdentifier, value);
+  console.log('SetPropertyUnsignedInteger successful. Value: ' + value);
+  return true;
+}
+
+function SetPropertyEnumerated(deviceInstance: number, objectType: number, objectInstance: number, propertyIdentifier: number, value: number, useArrayIndex: boolean, propertyArrayIndex: number, priority: number, errorCode: Buffer): boolean {
+  console.log('SetPropertyEnumerated deviceInstance: ' + deviceInstance + ', objectType: ' + objectType + ', objectInstance: ' + objectInstance + ', propertyIdentifier: ' + propertyIdentifier + ', useArrayIndex: ' + useArrayIndex + ', propertyArrayIndex: ' + propertyArrayIndex + ', priority: ' + priority );
+
+  // Only allow writes to specific objects and properties
+  if (deviceInstance != SETTING_DEVICE_INSTANCE || propertyIdentifier != BACNET_PROPERTY_IDENTIFIER_PRESENT_VALUE) {
+    return false;
+  }
+
+  if (objectType != BACNET_OBJECT_TYPE_BINARY_VALUE) {
+    return false;
+  }
+
+  // Example - Set to simple database
+  db.set('' + deviceInstance + '.' + objectType + '.' + objectInstance + '.' + propertyIdentifier, value);
+  console.log('SetPropertyEnumerated successful. Value: ' + value);
+  return true;
+}
 
 // 
 // Main
-StartUp()
+StartUp();
