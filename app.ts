@@ -27,6 +27,7 @@ const BACNET_OBJECT_TYPE_DEVICE: Number = 8;
 const BACNET_OBJECT_TYPE_MULTI_STATE_INPUT: Number = 13;
 const BACNET_OBJECT_TYPE_MULTI_STATE_OUTPUT: Number = 14;
 const BACNET_OBJECT_TYPE_MULTI_STATE_VALUE: Number = 19;
+const BACNET_OBJECT_TYPE_NETWORK_PORT: Number = 56;
 
 const SERVICES_SUPPORTED_SUBSCRIBE_COV: number = 5;
 const SERVICES_SUPPORTED_READ_PROPERTY_MULTIPLE: number = 14;
@@ -34,6 +35,8 @@ const SERVICES_SUPPORTED_WRITE_PROPERTY: number = 15;
 const SERVICES_SUPPORTED_WRITE_PROPERTY_MULTIPLE: number = 16;
 
 const BACNET_PROPERTY_IDENTIFIER_OBJECT_NAME: number = 77;
+const BACNET_PROPERTY_IDENTIFIER_EVENT_STATE: number = 36;
+const BACNET_PROPERTY_IDENTIFIER_OUT_OF_SERVICE: number = 81;
 const BACNET_PROPERTY_IDENTIFIER_PRESENT_VALUE: number = 85;
 const BACNET_PROPERTY_IDENTIFIER_UNITS: number = 117;
 const BACNET_PROPERTY_IDENTIFIER_NUMBER_OF_STATES: number = 74;
@@ -126,6 +129,12 @@ function StartUp() {
   CASBACnetStack.AddObject(SETTING_DEVICE_INSTANCE, BACNET_OBJECT_TYPE_MULTI_STATE_INPUT, 13);
   // CASBACnetStack.AddObject(SETTING_DEVICE_INSTANCE, BACNET_OBJECT_TYPE_MULTI_STATE_OUTPUT, 14);
   CASBACnetStack.AddObject(SETTING_DEVICE_INSTANCE, BACNET_OBJECT_TYPE_MULTI_STATE_VALUE, 19);
+  
+  // Add a network port object
+	// const NETWORK_TYPE_IPV4 :number = 5;
+  // const PROTOCOL_LEVEL_BACNET_APPLICATION :number = 2;
+  // const NETWORK_PORT_LOWEST_PROTOCOL_LAYER :number = 4194303;
+  // CASBACnetStack.AddNetworkPortObject(SETTING_DEVICE_INSTANCE, 56, NETWORK_TYPE_IPV4, PROTOCOL_LEVEL_BACNET_APPLICATION, NETWORK_PORT_LOWEST_PROTOCOL_LAYER);
 
   // Set some properties to be writable
   CASBACnetStack.SetPropertyWritable(SETTING_DEVICE_INSTANCE, BACNET_OBJECT_TYPE_ANALOG_VALUE, 2, BACNET_PROPERTY_IDENTIFIER_PRESENT_VALUE, true);
@@ -164,6 +173,7 @@ function StartUp() {
   db.set('' + SETTING_DEVICE_INSTANCE + '.' + BACNET_OBJECT_TYPE_MULTI_STATE_VALUE + '.19.' + BACNET_PROPERTY_IDENTIFIER_PRESENT_VALUE, 3);
   db.set('' + SETTING_DEVICE_INSTANCE + '.' + BACNET_OBJECT_TYPE_MULTI_STATE_VALUE + '.19.' + BACNET_PROPERTY_IDENTIFIER_STATE_TEXT, multi_state_value_statetext);
   db.set('' + SETTING_DEVICE_INSTANCE + '.' + BACNET_OBJECT_TYPE_MULTI_STATE_VALUE + '.19.' + BACNET_PROPERTY_IDENTIFIER_NUMBER_OF_STATES, multi_state_value_statetext.length);
+  // db.set('' + SETTING_DEVICE_INSTANCE + '.' + BACNET_OBJECT_TYPE_NETWORK_PORT + '.56.' + BACNET_PROPERTY_IDENTIFIER_OBJECT_NAME, "NetworkPort Vermilion");
 
 
   // Setup the UDP Socket
@@ -245,7 +255,7 @@ function StartUp() {
 
     // Tell the CAS BACnet Stack that the value has been update so that it can send COV messages
     CASBACnetStack.ValueUpdated(SETTING_DEVICE_INSTANCE, BACNET_OBJECT_TYPE_ANALOG_INPUT, 0, BACNET_PROPERTY_IDENTIFIER_PRESENT_VALUE);
-  }, 1000); // 1 second
+  }, 30*1000); // 30 second
 
 }
 
@@ -327,7 +337,7 @@ function CallbackGetSystemTime(): number {
 
 function CallbackLogDebugMessage(messageBuffer: Buffer, _messageBufferLength: number, messageType: number): void {
   // Convert the message from the CAS BACnet Stack buffer to a string that can be read by the NodeJS application.
-  // console.log(messageBuffer.toString("utf8").replace("\n", ""));
+  console.log(messageBuffer.toString("utf8").replace("\n", ""));
 }
 
 
@@ -400,6 +410,10 @@ export function GetPropertyReal(deviceInstance: number, objectType: number, obje
 function GetPropertyBool(deviceInstance: number, objectType: number, objectInstance: number, propertyIdentifier: number, value: Buffer, useArrayIndex: boolean, propertyArrayIndex: number): boolean {
   console.log('GetPropertyBool deviceInstance: ' + deviceInstance + ', objectType: ' + objectType + ', objectInstance: ' + objectInstance + ', propertyIdentifier: ' + propertyIdentifier + ', useArrayIndex: ' + useArrayIndex + ', propertyArrayIndex: ' + propertyArrayIndex);
 
+  if(propertyIdentifier == BACNET_PROPERTY_IDENTIFIER_OUT_OF_SERVICE) {
+    return false ; // Always return false for this property, BACnet Stack will handle the value.
+  }
+
   // Example - Get from simple database
   let dbValue = db.get('' + deviceInstance + '.' + objectType + '.' + objectInstance + '.' + propertyIdentifier);
   if (dbValue === undefined) {
@@ -419,6 +433,11 @@ function GetPropertyBool(deviceInstance: number, objectType: number, objectInsta
 
 function GetPropertyEnumerated(deviceInstance: number, objectType: number, objectInstance: number, propertyIdentifier: number, value: Buffer, useArrayIndex: boolean, propertyArrayIndex: number): boolean {
   console.log('GetPropertyEnumerated deviceInstance: ' + deviceInstance + ', objectType: ' + objectType + ', objectInstance: ' + objectInstance + ', propertyIdentifier: ' + propertyIdentifier + ', useArrayIndex: ' + useArrayIndex + ', propertyArrayIndex: ' + propertyArrayIndex);
+
+  if(propertyIdentifier == BACNET_PROPERTY_IDENTIFIER_EVENT_STATE) {
+    return false ; // Always return false for this property, BACnet Stack will handle the value.
+  }
+
 
   // Example - Get from simple database
   let dbValue = db.get('' + deviceInstance + '.' + objectType + '.' + objectInstance + '.' + propertyIdentifier);

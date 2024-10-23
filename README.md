@@ -2,6 +2,8 @@
 
 A BACnet Server Example written in [TypeScript](https://www.typescriptlang.org/) using the [CAS BACnet Stack](https://store.chipkin.com/services/stacks/bacnet-stack). This is a basic server example and does not include all of the functionality of the CAS BACnet Stack. See [BACnetServerExampleCPP](https://github.com/chipkin/BACnetServerExampleCPP) for a full featured example.
 
+Use the [Chipkin BACnet Explorer](https://store.chipkin.com/products/tools/cas-bacnet-explorer) to discover this device.
+
 ## Supported CAS BACnet Stack Version
 
 This example project uses version `5.1.0.2541-21` of the [CAS BACnet Stack](https://store.chipkin.com/services/stacks/bacnet-stack)
@@ -14,6 +16,8 @@ npm install
 npm run start
 ```
 
+## Device Tree
+
 - Device: 389055 (CAS BACnet Stack TypeScript Example)
   - analog_input: 0 (AnalogInput Bronze)
   - analog_value: 2 (AnalogValue Diamond) - Writable
@@ -25,8 +29,6 @@ npm run start
 ## Example Output
 
 ```txt
-
-
 FYI: BACnet Server Example in TypeScript Version: 1.0.0
 FYI: https://github.com/chipkin/BACnetServerExampleTypeScript
 FYI: CAS BACnet Stack Version: 5.1.0.2541-21
