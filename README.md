@@ -16,15 +16,42 @@ npm install
 npm run start
 ```
 
-## Device Tree
+## Device
+
+When discover the BACnet device should have the following object types
 
 - Device: 389055 (CAS BACnet Stack TypeScript Example)
-  - analog_input: 0 (AnalogInput Bronze)
-  - analog_value: 2 (AnalogValue Diamond) - Writable
-  - binary_input: 3 (BinaryInput Emerald)
-  - binary_value: 5 (BinaryValue Gold)  - Writable
-  - multi_state_input: 13 (MultiStateInput Hot Pink)
-  - multi_state_value: 19 (MultiStateValue Kiwi)  - Writable
+  - Analog Input: 0
+    - Object Name: "AnalogInput Bronze"
+    - Present Value: Updates every 30 seconds by 1.1
+  - Analog Value: 2
+    - Object Name: "AnalogValue Diamond"
+    - Present Value: Writable
+  - Binary Input: 3
+    - Object Name: "BinaryInput Emerald"
+  - Binary Value: 5
+    - Object Name: "BinaryValue Gold"
+    - Present Value: Writable
+  - MultiState Input: 13
+    - Object Name: "MultiStateInput Hot Pink"
+  - MultiState Value: 19
+    - Object Name: "MultiStateValue Kiwi"
+    - Present Value: Writable
+  - Network Port: 56
+    - Object Name: "NetworkPort Vermilion"
+
+### Supported Services
+
+The following services are supported in this example. Other serviecs are avalaible in the [CAS BACnet Stack](https://store.chipkin.com/services/stacks/bacnet-stack)
+
+- Read Property
+- Read Property Multiple
+- Write Property
+- Write Property Multiple
+- Subscribe Cov
+- Device Communication Control
+- Subscribe Cov Property
+- Subscribe Cov Property Multiple
 
 ## Example Output
 
@@ -42,4 +69,17 @@ Received message from: 192.168.2.31:47808, messageLength: 17
 GetPropertyEnumerated deviceInstance: 389055, objectType: 3, objectInstance: 3, propertyIdentifier: 85, useArrayIndex: false, propertyArrayIndex: 0
 Sending message to: 192.168.2.31:47808, messageLength: 20
 Received message from: 192.168.2.31:47808, messageLength: 19
+```
+
+## Notes
+
+### The value is not defined in the database
+
+The CAS BACnet Stack requests a value for all requested properties using a CallBackGetProperty function. If that callback function returns a false. A default will be used. It is normal to have ```The value is not defined in the database``` warnings as the default will be used for these properties.
+
+Example:
+
+```txt
+GetPropertyUnsignedInteger deviceInstance: 389055, objectType: 8, objectInstance: 389055, propertyIdentifier: 62, useArrayIndex: false, propertyArrayIndex: 0
+The value is not defined in the database.
 ```
