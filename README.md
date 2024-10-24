@@ -10,7 +10,10 @@ This example project uses version `5.1.0.2541-21` of the [CAS BACnet Stack](http
 
 ## Building
 
+NPM login to Chipkin Gitlab instance for the [CAS BACnet Stack](https://store.chipkin.com/services/stacks/bacnet-stack).
+
 ```bash
+echo @chipkin:registry=https://gitlab.com/api/v4/packages/npm/ >> .npmrc
 npm i typescript --save-dev
 npm install
 npm run start
